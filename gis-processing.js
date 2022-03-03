@@ -4,26 +4,24 @@ var portal = Portal('https://maps.co.kendall.il.us/portal')
 // Get docs layer
 var docs = FeatureSetByPortalItem(
     portal,
-    'cabe28ff862e40a49aa4752f2df46d98',
+    'da490f45ce954edca8ba4a5cd156564b',
     0,
     ['doc_num', 'doc_type', 'globalid', 'status'],
     false
 )
 
-// Filter for all non-GIS Review statuses
-var fdocs = Filter(docs, 'status <> 3')
-
 // Get PINs table for later
 var all_pins = FeatureSetByPortalItem(
     portal,
-    'cabe28ff862e40a49aa4752f2df46d98',
+    'da490f45ce954edca8ba4a5cd156564b',
     2,
     ['pin', 'pin_type'],
     false
 )
 
-// // Function to check pin array; CAN'T USE Any IN CURRENT VERSION
-// function AllClear(value){ return value['cleared'] == 1 }
+// ItemIDs of survey forms
+var review_form = 'b6c2f164b6e646c099850e8a974ad194'
+var process_form = '2ed60a8996484596bd821f7b5807a358'
 
 // Output dictionary
 var out_dict = {
@@ -32,7 +30,9 @@ var out_dict = {
         {name: 'doc_type',          type: 'esriFieldTypeString'},
         {name: 'processing_status', type: 'esriFieldTypeString'},
         {name: 'doc_guid',          type: 'esriFieldTypeGUID'},
-        {name: 'processor',         type: 'esriFieldTypeString'}
+        {name: 'processor',         type: 'esriFieldTypeString'},
+        {name: 'form_id',           type: 'esriFieldTypeString'},
+        {name: 'process_step',   type: 'esriFieldTypeInteger'}
     ],
     geometryType: '',
     features: []
@@ -55,7 +55,7 @@ var gis_docs = [
 ]
 
 // Iterate over docs
-for (var d in fdocs){
+for (var d in docs){
     
     Console(`Checking doc ${d['doc_num']}`)
 
@@ -65,6 +65,8 @@ for (var d in fdocs){
     var fabric = 1;
     var qc = 1;
     var processor;
+    var form_id = '';
+    var process_step = -1;
 
     // Get associated reviews, if any
     var rvws = FeatureSetByRelationshipName(d, 'gis_review', ['review_result', 'created_date'])
@@ -164,14 +166,37 @@ for (var d in fdocs){
             }
         }
 
-        // Determine processing status based on flags
+        // Determine processing status and step name based on flags
         var processing_status = When(
             qc == 2, 'Done',
-            fabric == 2, 'Needs QC',
-            devnet == 2 || devnet == 0, 'Needs Fabric',
-            tc == 2, 'Needs Devnet',
+            fabric == 2, 'QC',
+            devnet == 2 || devnet == 0, 'Fabric',
+            tc == 2, 'Devnet',
             'Pending T/C'
         )
+        
+        // Need processing step as integer to pass to forms
+        process_step = Decode(
+            processing_status,
+            'QC', 2,
+            'Fabric', 1,
+            'Devnet', 0,
+            -1
+        )
+
+        form_id = process_form
+
+    } else if (d['status'] == 3) {
+        Console('\tDoc needs reviews.')
+        form_id = review_form
+        var processing_status = 'Review'
+    } else {
+        Console('\tDoc does not belong in queue.')
+        continue
+    }
+    
+    // If processing is complete, we don't need it in the output
+    if (processing_status != 3){
 
         // Populate output dictionary
         Push(
@@ -182,13 +207,12 @@ for (var d in fdocs){
                     doc_type:          d['doc_type'],
                     processing_status: processing_status,
                     doc_guid:          d['globalid'],
-                    processor:         processor
+                    processor:         processor,
+                    form_id:           form_id,
+                    process_step:      process_step
                 }
             }
         )
-    } else {
-        Console('\tDoc has no reviews. Moving to next.')
-        continue
     }
 }
 
