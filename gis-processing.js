@@ -71,8 +71,8 @@ for (var d in docs){
     // Get associated reviews, if any
     var rvws = FeatureSetByRelationshipName(d, 'gis_review', ['review_result', 'created_date'])
 
-    // If reviews exist, set flag and check review result, otherwise move on
-    if (Count(rvws) > 0){
+    // If reviews exist and status has been updated, set flag and check review result, otherwise move on
+    if (Count(rvws) > 0 && d['status'] > 3){
 
         // Determine if doc is GIS or Assessor
         if (Includes(gis_docs, d['doc_type'])){
@@ -95,6 +95,11 @@ for (var d in docs){
 
             // Get PINs associated w/ doc
             var pins = FeatureSetByRelationshipName(d, 'pins', ['pin', 'pin_type'])
+
+            // Count of new/remainder PINs; All split/combo docs will need at least one
+            var npins = Count(Filter(pins, 'pin_type IN(1,2)'))
+
+            // Some docs will not create any PINs, but we will make use of placeholders to get around this
 
             // Retired PINs only
             var rpins = Filter(pins, 'pin_type = 4')
@@ -166,11 +171,16 @@ for (var d in docs){
             }
         }
 
-        // Determine processing status and step name based on flags
+        // Determine processing status and step name based on flags / status
+
         var processing_status = When(
+            // QC is done, doc is "dead"
             qc == 2, 'Done',
-            fabric == 2, 'QC',
-            devnet == 2 || devnet == 0, 'Fabric',
+            // If QC not done, check for fabric. Fabric needs to be done AND status changed from "processing"
+            fabric == 2 && d['status'] < 5, 'QC',
+            // If Fabric not donecheck for Devnet. Devnet needs to be done AND new PINs added, or else Devnet needs to be unnecessary.
+            (devnet == 2 && npins > 0) || devnet == 0, 'Fabric',
+            // If Devnet not done / unnecessary, check for T/C clearance
             tc == 2, 'Devnet',
             'Pending T/C'
         )
@@ -196,7 +206,7 @@ for (var d in docs){
     }
     
     // If processing is complete, we don't need it in the output
-    if (processing_status != 3){
+    if (processing_status != 'Done'){
 
         // Populate output dictionary
         Push(
