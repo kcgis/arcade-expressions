@@ -156,6 +156,31 @@ function PushFeature(doc_num, doc_type, processing_status, guid, processor, form
     )
 };
 
+/* CriteriaString FUNCTION
+    When a document enters a given status, it is helpful to have a list of items which need to be done.
+    The dashboard itself can split this string into multiple lines, but it cannot parse a dictionary.
+    That means we've got to get our string 90% of the way here.
+
+    Parameters:
+        criteria (array of dictionaries)
+
+    Returns:
+        pipe (|) delimited string
+*/
+
+function CriteriaString(criteria){
+
+    var c_arr = [];
+
+    for (var c in criteria){
+        var stat = Iif(criteria[c]['status'], '✔️', '❌')
+
+        Push(c_arr, `${stat} ${criteria[c]['criteria']}`)
+    }
+
+    return Concatenate(c_arr, '|')
+}
+
 /* MAIN BODY
     For each recorded document, it will move through the following steps on the GIS side:
         1. GIS Review
@@ -192,17 +217,9 @@ for (var d in docs){
     // Determine doc type
     var dtype = Iif(Includes(gis_docs, d['doc_type']), 'gis', 'assr')
 
-    // Empty warning string
+    // Empty warning string and criteria array
+    var criteria;
     var warning;
-
-    // Set default values; 0 = not needed, 1 = needed, 2 = complete
-    var tc = 0;
-    var devnet = 0;
-    var fabric = 1;
-    var qc = 1;
-    var processor;
-    var form_id = '';
-    var process_step = -1;
 
     /* GIS REVIEW
         Conditions:
@@ -244,7 +261,7 @@ for (var d in docs){
     )
 
     // Now check if status has been updated
-    review_status_change = Iif(d['status'] == 3, false, true )
+    review_status_change = Iif(d['status'] == 3 || (d['status'] == 0 && dtype == 'gis'), false, true )
 
     // Now we check the review flags. If all three are met, proceed, otherwise push the feature to Review.
     if (review_done && review_status_change && review_retiredpins){
@@ -252,14 +269,20 @@ for (var d in docs){
         Console('\tDoc meets all criteria. Moving to Devnet.')
 
     } else {
+        
+        criteria = [
+            {criteria: 'Document Reviewed', status: review_done},
+            {criteria: 'Retired PINs Added / Not Needed', status: review_retiredpins},
+            {criteria: 'Status Updated', status: review_status_change}
+        ]
 
-        warning = `Reviewed: ${review_done}\nRetired PINs added or not needed: ${review_retiredpins}\nStatus updated: ${review_status_change}`
+        warning = CriteriaString(criteria)
         
         Console(warning)
 
         PushFeature(
             d['doc_num'],
-            d['doc_type'],
+            dtype,
             'Review',
             d['globalid'],
             null,
@@ -294,7 +317,7 @@ for (var d in docs){
     
     /* First, we'll check if Devnet is even necessary for this document. Documents with a 'good legal' review do not.
     Additionally, 'good legal' docs only need to pass through if they are GIS documents. Assessor docs can be dropped at this point entirely. */
-    if (rvw < 2){
+    if (rvw != 2){
 
         if (dtype == 'assr'){
         
@@ -327,7 +350,7 @@ for (var d in docs){
 
         PushFeature(
             d['doc_num'],
-            d['doc_type'],
+            dtype,
             'Pending T/C',
             d['globalid'],
             null,
@@ -344,13 +367,18 @@ for (var d in docs){
 
     } else {
 
-        warning = `Devnet processed: ${devnet_done}\nAt least 1 new PIN added: ${devnet_newpins}`
+        criteria = [
+            {criteria: 'Devnet Processed', status: devnet_done},
+            {criteria: 'New / Remainder / Placeholder PIN(s) Added', status: devnet_newpins}
+        ]
+
+        warning = CriteriaString(criteria)
         
         Console(warning)
 
         PushFeature(
             d['doc_num'],
-            d['doc_type'],
+            dtype,
             'Devnet',
             d['globalid'],
             null,
@@ -379,22 +407,26 @@ for (var d in docs){
     // Fabric flags
     var fabric_done = Iif(proc_fabric_count > 0, true, false)
     var fabric_status_change = Iif(d['status'] != 4, true, false)
-    var fabric_pins_added = Iif(npin_count > 0, true, false)
 
     // If all criteria met, move into QC. Otherwise, push feature to Fabric
-    if (fabric_done && fabric_status_change && fabric_pins_added){
+    if (fabric_done && fabric_status_change){
 
         Console('\tDoc meets all criteria. Moving to QC.')
 
     } else {
 
-        warning = `Fabric processed: ${fabric_done}\nStatus updated: ${fabric_status_change}\nNew/Remainder/Placeholder PIN(s) added:${fabric_pins_added}`
+        criteria = [
+            {criteria: 'Fabric Processed', status: fabric_done},
+            {criteria: 'Status Updated', status: fabric_status_change}
+        ]
+
+        warning = CriteriaString(criteria)
 
         Console(warning)
 
         PushFeature(
             d['doc_num'],
-            d['doc_type'],
+            dtype,
             'Fabric',
             d['globalid'],
             null,
@@ -425,7 +457,7 @@ for (var d in docs){
 
         PushFeature(
             d['doc_num'],
-            d['doc_type'],
+            dtype,
             'QC',
             d['globalid'],
             processor,
