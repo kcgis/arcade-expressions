@@ -31,6 +31,12 @@ var gis_docs = [
     'PLAT',
     'RESL',
     'MISC',
+    'ORD',
+    'DEC',
+    'SUBN',
+    'CONS',
+    'MEMO',
+    'NOT',
     'OR',
     'SR'
 ];
