@@ -50,7 +50,7 @@ var docs = Filter(
         ['doc_num', 'doc_type', 'globalid', 'status'],
         false
     ),
-    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}'))`
+    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}')) AND status <> 6`
 );
 
 // Get PINs table for later
