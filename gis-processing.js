@@ -192,7 +192,6 @@ function CriteriaString(criteria){
         1. GIS Review
         2. Devnet
         3. Fabric
-        4. QC
 
     Each of these steps requires the document and its related tables to be updated in some way.
     This expression uses calculated "flags" to determine what steps are necessary, and whether the criteria have been met or not.
@@ -325,7 +324,7 @@ for (var d in docs){
     Additionally, 'good legal' docs only need to pass through if they are GIS documents. Assessor docs can be dropped at this point entirely. */
     if (rvw != 2){
 
-        if (dtype == 'assr'){
+        if (dtype == 'assr' || rvw == 3){
         
             Console('\tDoc needs no further action from GIS.')
             continue
