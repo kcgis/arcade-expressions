@@ -37,7 +37,7 @@ var out_dict = {
 
 // For each processing item, check if parent doc has any QC already
 
-for ( var p in procs){
+for (var p in procs){
 
     // Get parent doc
     var doc = First(FeatureSetByRelationshipName(p, 'docs', ['doc_num'], false))
@@ -58,7 +58,7 @@ for ( var p in procs){
                 attributes: {
                     doc_num: doc['doc_num'],
                     doc_guid: p['doc_guid'],
-                    created_users: p['created_user']
+                    created_user: p['created_user']
                 }
             }
         )
