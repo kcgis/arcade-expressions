@@ -1,5 +1,5 @@
-# workflow-expressions
-Arcade Expressions for the Recorded Document Workflow
+# Arcade
+Arcade Expressions for the Recorded Document Workflow and other things
 
 The workflow makes extensive use of **Data Expressions**. These are written in *Arcade*, a JS-like language specific to Esri products. Writing expressions in the Dashboard can be problematic, as users are unable to save an expression unless it has a valid output.
 
