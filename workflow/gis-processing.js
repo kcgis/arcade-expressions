@@ -21,7 +21,6 @@ var portal = Portal('https://maps.co.kendall.il.us/portal');
 
 // List of GIS docs
 var gis_docs = [
-    'AFFD',
     'ANXA',
     'ANXO',
     'COMD',
@@ -30,12 +29,10 @@ var gis_docs = [
     'ORDI',
     'PLAT',
     'RESL',
-    'MISC',
     'ORD',
     'DEC',
     'SUBN',
     'CONS',
-    'MEMO',
     'NOT',
     'OR',
     'SR'
@@ -50,7 +47,7 @@ var docs = Filter(
         ['doc_num', 'doc_type', 'globalid', 'status'],
         false
     ),
-    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}')) AND status <> 6`
+    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}')) AND status <> 6` // append "AND doc_num LIKE '202200008%'" or similar for testing against a subset
 );
 
 // Get PINs table for later
@@ -192,6 +189,7 @@ function CriteriaString(criteria){
         1. GIS Review
         2. Devnet
         3. Fabric
+        4. QC
 
     Each of these steps requires the document and its related tables to be updated in some way.
     This expression uses calculated "flags" to determine what steps are necessary, and whether the criteria have been met or not.
@@ -208,9 +206,9 @@ for (var d in docs){
     var rvw;
 
     // Get associated PINs and specific type counts, if any
-    var pins = FeatureSetByRelationshipName(d, 'pins', ['pin', 'pin_type']);
+    var pins = FeatureSetByRelationshipName(d, 'pins', ['pin', 'pin_type', 'pin_year']);
     var npin_count = Count(Filter(pins, 'pin_type IN(1,2,5)'));
-    var rpins = Filter(pins, 'pin_type = 4');
+    var rpins = Filter(pins, `pin_type = 4 AND (pin_year IS NULL OR pin_year < ${Year(Now())})`);
     var rpin_count = Count(rpins);
 
     // Get associated processing and type counts
@@ -283,7 +281,7 @@ for (var d in docs){
 
         warning = CriteriaString(criteria)
         
-        Console(warning)
+        Console(`\t${warning}`)
 
         PushFeature(
             d['doc_num'],
@@ -324,7 +322,7 @@ for (var d in docs){
     Additionally, 'good legal' docs only need to pass through if they are GIS documents. Assessor docs can be dropped at this point entirely. */
     if (rvw != 2){
 
-        if (dtype == 'assr' || rvw == 3){
+        if (dtype == 'assr'){
         
             Console('\tDoc needs no further action from GIS.')
             continue
@@ -379,7 +377,7 @@ for (var d in docs){
 
         warning = CriteriaString(criteria)
         
-        Console(warning)
+        Console(`\t${warning}`)
 
         PushFeature(
             d['doc_num'],
@@ -411,12 +409,12 @@ for (var d in docs){
 
     // Fabric flags
     var fabric_done = Iif(proc_fabric_count > 0, true, false)
-    var fabric_status_change = Iif(d['status'] != 4, true, false)
+    var fabric_status_change = Iif(d['status'] != 5, true, false)
 
     // If all criteria met, move into QC. Otherwise, push feature to Fabric
-    if (fabric_done && fabric_status_change){
+    if ((fabric_done && fabric_status_change) || rvw == 3){
 
-        Console('\tDoc meets all criteria. Moving to QC.')
+        Console('\tDoc meets all criteria. No further processing required.')
 
     } else {
 
@@ -427,7 +425,7 @@ for (var d in docs){
 
         warning = CriteriaString(criteria)
 
-        Console(warning)
+        Console(`\t${warning}`)
 
         PushFeature(
             d['doc_num'],
@@ -442,34 +440,6 @@ for (var d in docs){
 
         continue
 
-    }
-    
-    /* QC
-        Conditions:
-            Fabric processing completed
-            Can be ANY status
-
-        Completion criteria
-            - Processing entry added
-
-        This one is simple. Regardless of status, if fabric is complete, QC is needed.
-        If QC is done, the doc does not get added to the workflow because it's finished.
-    */
-
-    if (proc_qc_count == 0){
-
-        var processor = First(Filter(proc, 'process_step == 1'))['created_user']
-
-        PushFeature(
-            d['doc_num'],
-            dtype,
-            'QC',
-            d['globalid'],
-            processor,
-            process_form,
-            2,
-            null
-        )
     }
 }
 
