@@ -6,18 +6,14 @@ var pins = FeatureSetByPortalItem(
     portal,
     'da490f45ce954edca8ba4a5cd156564b',
     2,
-    ['pin', 'pin_type', 'globalid'],
+    ['pin', 'pin_type', 'globalid', 'pin_year'],
     false
 )
 
 // Filter for retired PINs
-var retired_pins = Filter(pins, 'pin_type = 4')
+var retired_pins = Filter(pins, `pin_type = 4 AND (pin_year IS NULL OR pin_year < ${Year(Now())})`)
 
-/*
-Intermediate dict. We need to create a FeatureSet of all retired PINs in order to retain the parent GUID.
-We also want to check if a given PIN was retired on a different, prior document.
-*/
-
+// Intermediate dict
 var all_pins_dict = {
     fields: [
         {name: 'pin', type: 'esriFieldTypeString'},
@@ -42,18 +38,18 @@ for (var p in retired_pins){
     // Get reviews
     var rvws = FeatureSetByRelationshipName(p, 'tc_review', ['review_type', 'review_result', 'created_date'])
 
-    // Get treasurer reviews only. Set this to '1' to return clerk reviews.
-    var t_rvws = Filter(rvws, 'review_type = 0')
+    // Get treasurer reviews only
+    var c_rvws = Filter(rvws, 'review_type = 1')
     
     // Empty variables
     var latest_rvw_date = Null;
     var latest_rvw_result = Null;
         
     // Check if any treasurer reviews exist, overwrite variables
-    If(Count(t_rvws) > 0){
+    If(Count(c_rvws) > 0){
         
         // Sort by date and take most recent, get attributes
-        var latest_rvw = First(OrderBy(t_rvws, 'created_date DESC'))
+        var latest_rvw = First(OrderBy(c_rvws, 'created_date DESC'))
         latest_rvw_date = Number(latest_rvw['created_date'])
         latest_rvw_result = DomainName(latest_rvw, 'review_result')
         
