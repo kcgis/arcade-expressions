@@ -35,7 +35,8 @@ var gis_docs = [
     'CONS',
     'NOT',
     'OR',
-    'SR'
+    'SR',
+    'DED'
 ];
 
 // Get docs layer
