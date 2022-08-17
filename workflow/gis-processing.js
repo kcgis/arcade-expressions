@@ -48,7 +48,8 @@ var docs = Filter(
         ['doc_num', 'doc_type', 'globalid', 'status'],
         false
     ),
-    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}')) AND status <> 6` // append "AND doc_num LIKE '202200008%'" or similar for testing against a subset
+    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}')) AND status <> 6` 
+    // append "AND doc_num LIKE '202200008%'" or similar for testing against a subset
 );
 
 // Get PINs table for later
@@ -56,7 +57,7 @@ var all_pins = FeatureSetByPortalItem(
     portal,
     'da490f45ce954edca8ba4a5cd156564b',
     2,
-    ['pin', 'pin_type'],
+    ['pin', 'pin_type', 'pin_year'],
     false
 );
 
@@ -84,10 +85,8 @@ var out_dict = {
     When a document will retire PINs due to a split or combo, all PINs need to be cleared by the Treasurer and Clerk before they can be officially retired.
     Given a FeatureSet of retired PINs, this function will check the all_pins FeatureSet for any matching PINs.
     Each matching PIN will be checked to see if the Treasurer and Clerk have reviewed the PIN within the current calendar year.
-
     Parameters:
         retired_pins (FeatureSet)
-
     Returns:
         boolean
 */
@@ -107,6 +106,15 @@ function PINcheck(retired_pins){
         // PINs should exist for all 
         // Iterate over matching PINs and get reviews
         for (var mp in matching_pins){
+            
+            // Any same-year PINs can immediately populate the pin_arr with a 1
+            if (mp['pin_year'] == Year(Now())){
+                Push(pin_arr, 1)
+            }
+            
+            continue
+            
+            // Other retired PINs need to be checked
             var tc_rvws = FeatureSetByRelationshipName(mp, 'tc_review', ['review_type', 'review_result', 'created_date'])
 
             // Check if reviews exist for PIN
@@ -136,7 +144,6 @@ function PINcheck(retired_pins){
 /* PushFeature FUNCTION
     As we move through the documents list, we will be using Push to add our features to the output array.
     The fields in the output never change, just their values. Rather than write out an entire feature dictionary every time we need to push a feature, we will use this function.
-
     Parameters:
         These follow the fields of the output dictionary.
 */
@@ -164,10 +171,8 @@ function PushFeature(doc_num, doc_type, processing_status, guid, processor, form
     When a document enters a given status, it is helpful to have a list of items which need to be done.
     The dashboard itself can split this string into multiple lines, but it cannot parse a dictionary.
     That means we've got to get our string 90% of the way here.
-
     Parameters:
         criteria (array of dictionaries)
-
     Returns:
         pipe (|) delimited string
 */
@@ -191,7 +196,6 @@ function CriteriaString(criteria){
         2. Devnet
         3. Fabric
         4. QC
-
     Each of these steps requires the document and its related tables to be updated in some way.
     This expression uses calculated "flags" to determine what steps are necessary, and whether the criteria have been met or not.
     To facilitate these checks, as many flags as possible are determined at the top of the loop.
@@ -209,7 +213,7 @@ for (var d in docs){
     // Get associated PINs and specific type counts, if any
     var pins = FeatureSetByRelationshipName(d, 'pins', ['pin', 'pin_type', 'pin_year']);
     var npin_count = Count(Filter(pins, 'pin_type IN(1,2,5)'));
-    var rpins = Filter(pins, `pin_type = 4 AND (pin_year IS NULL OR pin_year < ${Year(Now())})`);
+    var rpins = Filter(pins, `pin_type = 4`);
     var rpin_count = Count(rpins);
 
     // Get associated processing and type counts
@@ -230,12 +234,10 @@ for (var d in docs){
             status = 'GIS Review'
             OR
             (status = 'Open' and doctype = 'gis')
-
         Completion criteria
             - Document status must be updated
             - Document must have an associated review
             - If review == 'split/combo', at least one retired PIN needs to be added
-
         Because our docs FeatureSet has already been filtered, anything *without* a review should be on the GIS Review list until it meets all criteria.
     */
 
@@ -304,11 +306,9 @@ for (var d in docs){
             latest review = 'split/combo'
             AND
             PINs are cleared by T/C
-
         Completion criteria
             - Processing entry added
             - At least one new / remainder / placeholder PIN added
-
         Some docs entering DEVNET will not actually need this step, but we'll pass them through to be sure.
         Anything which falls into this bucket will *also* require the Treasurer and Clerk to sign off on the retired PINs.
         As part of the DEVNET stage of this expression, there will be a subroutine which can route documents to 'Pending T/C'.
@@ -400,11 +400,9 @@ for (var d in docs){
             Status = 'Processing'
             AND
             Devnet processing completed
-
         Completion criteria
             - Processing entry added
             - Status set to 'Assessor Review' or 'Closed', depending on doc type
-
         If a document has gotten to this point, it needs Fabric processing.
     */
 
