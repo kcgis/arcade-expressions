@@ -110,9 +110,8 @@ function PINcheck(retired_pins){
             // Any same-year PINs can immediately populate the pin_arr with a 1
             if (mp['pin_year'] == Year(Now())){
                 Push(pin_arr, 1)
+                continue
             }
-            
-            continue
             
             // Other retired PINs need to be checked
             var tc_rvws = FeatureSetByRelationshipName(mp, 'tc_review', ['review_type', 'review_result', 'created_date'])
