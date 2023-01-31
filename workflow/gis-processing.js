@@ -45,7 +45,7 @@ var docs = Filter(
         ['doc_num', 'doc_type', 'globalid', 'status'],
         false
     ),
-    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}')) AND status <> 6 AND doc_num LIKE '2023000%'` 
+    `status <> 2 AND (status <> 0 OR doc_type IN('${Concatenate(gis_docs, "','")}')) AND status <> 6` 
     // append "AND doc_num LIKE '202200008%'" or similar for testing against a subset
 );
 
@@ -104,7 +104,8 @@ function PINcheck(retired_pins){
         Push(pin_list, pin['pin'])
     }
 
-    var pin_str = `'${Concatenate(pin_list, "','")}'`
+        // Query PIN table for matching PINs
+        var matching_pins = Filter(all_pins, `pin_type = 4 AND pin = '${pin['pin']}'`)
 
     // Query tc table for matching pins, filtered to be same-year approved
     var approved_pins = Filter(tc, `pin IN(${pin_str})
@@ -208,7 +209,7 @@ for (var d in docs){
     // Get associated PINs and specific type counts, if any
     var pins = FeatureSetByRelationshipName(d, 'pins', ['pin', 'pin_type', 'pin_year']);
     var npin_count = Count(Filter(pins, 'pin_type IN(1,2,5)'));
-    var rpins = Filter(pins, `pin_type = 4`);
+    var rpins = Filter(pins, `pin_type = 4 AND (pin_year IS NULL OR pin_year < ${Year(Now())})`);
     var rpin_count = Count(rpins);
 
     // Get associated processing and type counts
